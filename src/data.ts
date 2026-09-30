@@ -1,5 +1,5 @@
 import type { Hero, Product, Settings } from './types';
-export const settings:Settings={business_name:'Faithly Fair',email:'Fairyfaithly@gmail.com',whatsapp:'918920925880',upi_id:'8920925990@fam',upi_payee_name:'Faithly Fair'};
+export const settings:Settings={business_name:'Faithly Fair',email:'Fairyfaithly@gmail.com',whatsapp:'',upi_id:'',upi_payee_name:'Faithly Fair'};
 export const fallbackHero:Hero={eyebrow:'Flowers that speak from the heart',title:'Bouquets made for unforgettable moments.',description:'Fresh, expressive arrangements designed to turn every feeling into something beautiful.',cta_label:'Explore bouquets',cta_link:'/shop'};
 export const fallbackProducts:Product[]=[
  {id:'demo-1',name:'Blushing Rose Bouquet',slug:'blushing-rose-bouquet',description:'Soft pink roses, seasonal greens and a flowing satin wrap.',price:899,stock_quantity:12,featured:true,active:true,display_order:1,category:'bouquet'},
@@ -7,4 +7,4 @@ export const fallbackProducts:Product[]=[
  {id:'demo-3',name:'Petite Love Bouquet',slug:'petite-love-bouquet',description:'A charming compact bouquet for birthdays, thank-yous and just because.',price:649,stock_quantity:15,featured:true,active:true,display_order:3,category:'bouquet'},
  {id:'demo-4',name:'Sweetheart Gift Hamper',slug:'sweetheart-gift-hamper',description:'A secondary little luxury filled with treats and thoughtful keepsakes.',price:1499,stock_quantity:7,featured:false,active:true,display_order:4,category:'hamper'}
 ];
-export const money=(n:number)=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(n);
+export const money=(n:number)=>new Intl.NumberFormat('en-NP',{style:'currency',currency:'NPR',maximumFractionDigits:0}).format(n);
