@@ -121,7 +121,7 @@ export default {
       } else if (["CANCELED", "NOT_FOUND", "FULL_REFUND"].includes(status)) {
         await supabase
           .from("orders")
-          .update({ payment_status: "payment_failed" })
+          .update({ payment_status: "rejected" })
           .eq("id", order.id);
       }
 
