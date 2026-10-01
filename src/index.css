@@ -514,3 +514,49 @@ footer{
   .esewa-success-card{grid-template-columns:1fr}
   .esewa-mark{width:100%;min-height:145px}
 }
+
+
+/* Refined payment radio controls */
+.payment-choices input[type="radio"]{
+  appearance:none;
+  -webkit-appearance:none;
+  width:22px !important;
+  height:22px;
+  min-width:22px;
+  margin:0 !important;
+  padding:0;
+  border:1.5px solid rgba(115,88,90,.42);
+  border-radius:50%;
+  background:rgba(255,255,255,.72);
+  display:grid;
+  place-items:center;
+  flex:0 0 22px;
+  cursor:pointer;
+  outline:none;
+  box-shadow:inset 0 1px 2px rgba(73,32,38,.05);
+  transition:border-color .25s ease,background .25s ease,box-shadow .25s ease,transform .2s ease;
+}
+.payment-choices input[type="radio"]::before{
+  content:"";
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background:var(--wine);
+  box-shadow:0 3px 9px rgba(148,70,77,.28);
+  transform:scale(0);
+  transition:transform .22s cubic-bezier(.16,1,.3,1);
+}
+.payment-choices input[type="radio"]:checked{
+  border-color:var(--wine);
+  background:rgba(255,246,245,.96);
+  box-shadow:0 0 0 4px rgba(148,70,77,.09);
+}
+.payment-choices input[type="radio"]:checked::before{
+  transform:scale(1);
+}
+.payment-choices input[type="radio"]:focus-visible{
+  box-shadow:0 0 0 4px rgba(148,70,77,.16);
+}
+.payment-choices>label:active input[type="radio"]{
+  transform:scale(.9);
+}
