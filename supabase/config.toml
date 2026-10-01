@@ -2,3 +2,10 @@ project_id = "faithly-fair"
 
 [functions.notify-order]
 verify_jwt = false
+
+
+[functions.esewa-init]
+verify_jwt = false
+
+[functions.esewa-verify]
+verify_jwt = false
