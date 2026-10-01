@@ -37,8 +37,8 @@ export default {
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
     try {
-      const { order_number, origin } = await req.json();
-      if (!order_number || !origin) return json({ error: "order_number and origin are required" }, 400);
+      const { order_number, upload_token, origin } = await req.json();
+      if (!order_number || !upload_token || !origin) return json({ error: "order_number, upload_token and origin are required" }, 400);
 
       const supabase = createClient(
         Deno.env.get("SUPABASE_URL")!,
@@ -47,11 +47,12 @@ export default {
 
       const { data: order, error } = await supabase
         .from("orders")
-        .select("order_number,total,payment_method,payment_status,payment_transaction_uuid")
+        .select("order_number,total,payment_method,payment_status,payment_transaction_uuid,upload_token")
         .eq("order_number", order_number)
         .maybeSingle();
 
       if (error || !order) return json({ error: "Order not found" }, 404);
+      if (order.upload_token !== upload_token) return json({ error: "Invalid order payment token" }, 403);
       if (order.payment_method !== "esewa") return json({ error: "Order is not an eSewa payment" }, 400);
       if (order.payment_status === "paid") return json({ error: "Order is already paid" }, 409);
 
@@ -63,7 +64,15 @@ export default {
         return json({ error: "eSewa credentials are not configured on the server" }, 500);
       }
 
-      const transactionUuid = order.payment_transaction_uuid || order.order_number;
+      let transactionUuid = order.payment_transaction_uuid || order.order_number;
+      if (order.payment_status === "rejected") {
+        transactionUuid = `${order.order_number}-${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
+        const { error: updateError } = await supabase
+          .from("orders")
+          .update({ payment_transaction_uuid: transactionUuid, payment_status: "payment_pending" })
+          .eq("order_number", order.order_number);
+        if (updateError) return json({ error: "Could not prepare a new eSewa transaction" }, 500);
+      }
       const total = Number(order.total).toFixed(2);
       const signedFieldNames = "total_amount,transaction_uuid,product_code";
       const message = `total_amount=${total},transaction_uuid=${transactionUuid},product_code=${productCode}`;
