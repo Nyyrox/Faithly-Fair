@@ -85,7 +85,7 @@ function Checkout({cart,site,clear}:{cart:CartItem[];site:Settings;clear:()=>voi
 
     if(method==='esewa'){
       const {data:payment,error:paymentError}=await supabase.functions.invoke('esewa-init',{
-        body:{order_number:data.order_number,origin:window.location.origin}
+        body:{order_number:data.order_number,upload_token:data.upload_token,origin:window.location.origin}
       });
       if(paymentError)throw paymentError;
       if(!payment?.endpoint||!payment?.fields)throw new Error('Could not initialize eSewa payment.');
