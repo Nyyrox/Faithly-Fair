@@ -190,3 +190,19 @@ $$;
 
 revoke all on function public.submit_payment_proof(uuid,text,text,integer) from public;
 grant execute on function public.submit_payment_proof(uuid,text,text,integer) to anon,authenticated;
+
+
+-- Disable the legacy screenshot-proof upload path now that eSewa is verified server-side.
+create or replace function public.can_upload_proof_path(object_name text)
+returns boolean
+language sql stable security definer set search_path = public as $$
+  select false;
+$$;
+
+revoke all on function public.can_upload_proof_path(text) from public;
+grant execute on function public.can_upload_proof_path(text) to anon, authenticated;
+
+-- Remove legacy India/UPI public settings if they exist.
+delete from public.site_settings
+where key in ('upi_id','upi_payee_name','whatsapp')
+  and value is not null;
