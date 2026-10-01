@@ -6,8 +6,7 @@ alter table public.orders add constraint orders_pincode_check
 
 alter type public.payment_method rename value 'upi' to 'esewa';
 
-alter type public.payment_state add value if not exists 'payment_pending';
-alter type public.payment_state add value if not exists 'payment_failed';
+alter type public.payment_state rename value 'awaiting_proof' to 'payment_pending';
 
 -- eSewa transaction state lives on the order so it can be verified server-side.
 alter table public.orders
