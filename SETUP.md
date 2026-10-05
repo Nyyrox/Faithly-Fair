@@ -38,7 +38,21 @@ For a product image, upload the file in **Storage → product-images**, copy its
 
 Payment proof is requested only for UPI. The QR contains the immutable server-calculated amount, `8920925990@fam`, `Faithly Fair`, INR, and the order number. A screenshot changes the order to `proof_submitted`; it does not prove bank settlement. Verify it manually in the admin area before changing payment to `verified` or `paid`.
 
-## 4. Automatic order email with Resend
+## 4. eSewa ePay production setup
+
+The customer's eSewa phone number/QR is **not** the merchant credential used by ePay. Automatic checkout requires an eSewa merchant **Product Code/Merchant ID** and **Secret Key** issued by eSewa. The secret key must stay in Supabase Edge Function secrets; never put it in `VITE_*` variables or the React app. eSewa's ePay flow requires a signed request and server-side transaction verification. citeturn0search1
+
+Set the production credentials in Supabase:
+
+```bash
+npx supabase secrets set ESEWA_ENV=production ESEWA_PRODUCT_CODE=YOUR_MERCHANT_PRODUCT_CODE ESEWA_SECRET_KEY=YOUR_LIVE_ESEWA_SECRET
+npx supabase functions deploy esewa-init --no-verify-jwt
+npx supabase functions deploy esewa-verify --no-verify-jwt
+```
+
+For testing, use `ESEWA_ENV=uat` and the UAT credentials supplied by eSewa. Do not commit live credentials to GitHub. eSewa provides production merchant credentials after the merchant completes its required testing/onboarding. citeturn0search3
+
+## 5. Automatic order email with Resend
 
 1. Create a Resend account, verify a sender domain, and create an API key.
 2. Install and sign in to the Supabase CLI, then link this folder to the project:
@@ -59,7 +73,7 @@ npx supabase functions deploy notify-order --no-verify-jwt
 5. Add a second webhook for `UPDATE` on `public.orders` if an email is also wanted when proof status changes. The function reads the current order securely and emails the fixed recipient.
 6. Place a test order and check Resend logs and `Fairyfaithly@gmail.com`. An email failure never rolls back or loses the order.
 
-## 5. WhatsApp and deployment
+## 6. WhatsApp and deployment
 
 WhatsApp buttons use a free prefilled `wa.me` chat for `+91 89209 25880`; no Meta Cloud API or paid messaging setup is required. Change public business values in `site_settings` from the Supabase Table Editor.
 
