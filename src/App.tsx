@@ -52,7 +52,7 @@ function CartPage({cart,qty,remove}:{cart:CartItem[];qty:(id:string,n:number)=>v
 
 function ProductPage({products,add}:{products:Product[];add:(p:Product)=>void}){const {slug}=useParams(),p=products.find(x=>x.slug===slug);if(!p)return <Navigate to="/"/>;return <main className="product-page"><div className="product-detail-art" style={{background:p.image_url?`url(${p.image_url}) center/cover`:placeholder(0)}}>{!p.image_url&&<Gift/>}</div><div className="product-detail-copy"><Link to="/">← Back to gifts</Link><span className="eyebrow">A thoughtful little something</span><h1>{p.name}</h1><div className="detail-price">{money(p.price)} <small>delivery included</small></div><p>{p.description}</p><ul><li><Check/> Carefully curated by hand</li><li><Check/> Beautifully gift-ready</li><li><Check/> Thoughtful, secure packaging</li></ul><button className="btn wide" disabled={!p.stock_quantity} onClick={()=>add(p)}><ShoppingBag/> Add to gift bag</button><small>{p.stock_quantity} currently available</small></div></main>}
 
-function Checkout({cart,site,clear}:{cart:CartItem[];site:Settings;clear:()=>void}){const nav=useNavigate(),total=cart.reduce((n,x)=>n+x.product.price*x.quantity,0),[method,setMethod]=useState<'cod'|'esewa'>('cod'),[busy,setBusy]=useState(false),[error,setError]=useState('');useEffect(()=>{const field=document.querySelector<HTMLInputElement>('input[name="email"]');if(field){field.required=true;field.placeholder='Required for order updates';field.setAttribute('aria-label','Email address required')}if(!supabase)setError('Checkout preview is active. Add your Supabase URL and anon key in .env.local before placing live orders.')},[]);
+function Checkout({cart,site,clear}:{cart:CartItem[];site:Settings;clear:()=>void}){const nav=useNavigate(),total=cart.reduce((n,x)=>n+x.product.price*x.quantity,0),[method,setMethod]=useState<'cod'|'esewa'>('cod'),[proofFile,setProofFile]=useState<File|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');useEffect(()=>{const field=document.querySelector<HTMLInputElement>('input[name="email"]');if(field){field.required=true;field.placeholder='Required for order updates';field.setAttribute('aria-label','Email address required')}if(!supabase)setError('Checkout preview is active. Add your Supabase URL and anon key in .env.local before placing live orders.')},[]);
  async function submit(e:FormEvent<HTMLFormElement>){
   e.preventDefault();
   setError('');
@@ -82,29 +82,29 @@ function Checkout({cart,site,clear}:{cart:CartItem[];site:Settings;clear:()=>voi
     if(error)throw error;
 
     if(method==='esewa'){
-      const {data:payment,error:paymentError}=await supabase.functions.invoke('esewa-init',{
-        body:{order_number:data.order_number,upload_token:data.upload_token,origin:window.location.origin}
+      if(!proofFile)throw new Error('Please upload your eSewa payment screenshot.');
+      if(!['image/jpeg','image/png','image/webp'].includes(proofFile.type)||proofFile.size>5*1024*1024){
+        throw new Error('Use a JPG, PNG, or WebP screenshot under 5 MB.');
+      }
+
+      const extension=proofFile.name.split('.').pop()?.toLowerCase()||'jpg';
+      const path=`${data.upload_token}/${crypto.randomUUID()}.${extension}`;
+      const {error:uploadError}=await supabase.storage.from('payment-proofs').upload(path,proofFile,{
+        contentType:proofFile.type,
+        upsert:false
       });
-      if(paymentError)throw paymentError;
-      if(!payment?.endpoint||!payment?.fields)throw new Error('Could not initialize eSewa payment.');
+      if(uploadError)throw uploadError;
+
+      const {error:proofError}=await supabase.rpc('submit_payment_proof',{
+        proof_token:data.upload_token,
+        storage_path:path,
+        file_type:proofFile.type,
+        file_size:proofFile.size
+      });
+      if(proofError)throw proofError;
 
       clear();
-
-      const form=document.createElement('form');
-      form.method='POST';
-      form.action=payment.endpoint;
-      form.style.display='none';
-
-      Object.entries(payment.fields).forEach(([name,value])=>{
-        const input=document.createElement('input');
-        input.type='hidden';
-        input.name=name;
-        input.value=String(value);
-        form.appendChild(input);
-      });
-
-      document.body.appendChild(form);
-      form.submit();
+      nav(`/order/${data.order_number}`,{state:{order:{...data,payment_status:'proof_submitted'},site}});
       return;
     }
 
@@ -117,7 +117,7 @@ function Checkout({cart,site,clear}:{cart:CartItem[];site:Settings;clear:()=>voi
   }
 }
  if(!cart.length)return <main className="checkout empty-page"><Gift/><h1>Your gift bag is empty</h1><Link className="btn" to="/#shop">Browse gifts</Link></main>;
- return <main className="checkout"><div className="checkout-head"><span className="eyebrow">Almost there</span><h1>Where should we send the joy?</h1><p>Delivery is included. Fill in the details below and choose how you'd like to pay.</p></div><form onSubmit={submit}><section className="form-card"><h2><em>1</em> Contact details</h2><div className="fields two"><label>Full name *<input name="name" required autoComplete="name" placeholder="Your full name"/></label><label>Mobile number *<input name="mobile" required pattern="(?:\+977[ -]?)?9[78][0-9]{8}" inputMode="tel" placeholder="+977 98XXXXXXXX"/></label><label>Alternate mobile<input name="alternate" pattern="(?:\\+977[ -]?)?9[78][0-9]{8}" inputMode="tel" placeholder="Optional Nepal mobile"/></label><label>Email<input name="email" type="email" placeholder="Optional"/></label></div></section><section className="form-card"><h2><em>2</em> Delivery address</h2><div className="fields"><label>Address line 1 *<input name="address1" required placeholder="House / flat number, street"/></label><label>Address line 2<input name="address2" placeholder="Area / locality"/></label><label>Landmark<input name="landmark" placeholder="Optional"/></label><div className="fields three"><label>City *<input name="city" required/></label>{site.show_state&&<label>State *<input name="state" required/></label>}{site.show_pincode&&<label>Pincode *<input name="pincode" required pattern="[0-9]{5}" inputMode="numeric"/></label>}</div></div></section><section className="form-card"><h2><em>3</em> Payment</h2><div className="payment-choices"><label className={method==='cod'?'selected':''}><input type="radio" checked={method==='cod'} onChange={()=>setMethod('cod')}/><span><b>Cash on delivery</b><small>Pay when your gift arrives</small></span><PackageCheck/></label><label className={method==='esewa'?'selected':''}><input type="radio" checked={method==='esewa'} onChange={()=>setMethod('esewa')}/><span><b>Pay with eSewa</b><small>Secure redirect to eSewa</small></span><ShieldCheck/></label></div></section>{error&&<p className="error">{error}</p>}<button className="btn wide submit" disabled={busy}>{busy?'Creating your order…':`Place order · ${money(total)}`}<ArrowRight/></button></form><aside className="order-summary"><h2>Your gift bag</h2>{cart.map(x=><div className="summary-line" key={x.product.id}><div className="mini-art" style={{background:x.product.image_url?`url(${x.product.image_url}) center/cover`:placeholder()}}/><span>{x.product.name}<small>Qty {x.quantity}</small></span><b>{money(x.product.price*x.quantity)}</b></div>)}<div className="summary-total"><span>Total <small>Delivery included</small></span><b>{money(total)}</b></div><p><LockKeyhole/> Secure checkout powered by Supabase</p></aside></main>}
+ return <main className="checkout"><div className="checkout-head"><span className="eyebrow">Almost there</span><h1>Where should we send the joy?</h1><p>Delivery is included. Fill in the details below and choose how you'd like to pay.</p></div><form onSubmit={submit}><section className="form-card"><h2><em>1</em> Contact details</h2><div className="fields two"><label>Full name *<input name="name" required autoComplete="name" placeholder="Your full name"/></label><label>Mobile number *<input name="mobile" required pattern="(?:\+977[ -]?)?9[78][0-9]{8}" inputMode="tel" placeholder="+977 98XXXXXXXX"/></label><label>Alternate mobile<input name="alternate" pattern="(?:\\+977[ -]?)?9[78][0-9]{8}" inputMode="tel" placeholder="Optional Nepal mobile"/></label><label>Email<input name="email" type="email" placeholder="Optional"/></label></div></section><section className="form-card"><h2><em>2</em> Delivery address</h2><div className="fields"><label>Address line 1 *<input name="address1" required placeholder="House / flat number, street"/></label><label>Address line 2<input name="address2" placeholder="Area / locality"/></label><label>Landmark<input name="landmark" placeholder="Optional"/></label><div className="fields three"><label>City *<input name="city" required/></label>{site.show_state&&<label>State *<input name="state" required/></label>}{site.show_pincode&&<label>Pincode *<input name="pincode" required pattern="[0-9]{5}" inputMode="numeric"/></label>}</div></div></section><section className="form-card"><h2><em>3</em> Payment</h2><div className="payment-choices"><label className={method==='cod'?'selected':''}><input type="radio" checked={method==='cod'} onChange={()=>setMethod('cod')}/><span><b>Cash on delivery</b><small>Pay when your gift arrives</small></span><PackageCheck/></label><label className={method==='esewa'?'selected':''}><input type="radio" checked={method==='esewa'} onChange={()=>setMethod('esewa')}/><span><b>Pay with eSewa QR</b><small>Scan, pay the exact amount, then upload screenshot</small></span><ShieldCheck/></label></div>{method==='esewa'&&<div className="esewa-qr-payment"><div className="esewa-qr-box"><QRCodeSVG value={JSON.stringify({eSewa_id:'9705197786',name:'MD Aaftab Hussain'})} size={220} includeMargin/></div><div><span className="eyebrow">Amount to pay</span><h3>{money(total)}</h3><p>Scan the QR in eSewa, enter this exact amount, complete the payment, then upload your screenshot.</p><label className="direct-upload"><Upload/><span>{proofFile?'Change screenshot':'Upload payment screenshot'}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>setProofFile(e.target.files?.[0]||null)}/></span></label>{proofFile&&<small>{proofFile.name}</small>}</div></div>}</section>{error&&<p className="error">{error}</p>}<button className="btn wide submit" disabled={busy}>{busy?'Creating your order…':`Place order · ${money(total)}`}<ArrowRight/></button></form><aside className="order-summary"><h2>Your gift bag</h2>{cart.map(x=><div className="summary-line" key={x.product.id}><div className="mini-art" style={{background:x.product.image_url?`url(${x.product.image_url}) center/cover`:placeholder()}}/><span>{x.product.name}<small>Qty {x.quantity}</small></span><b>{money(x.product.price*x.quantity)}</b></div>)}<div className="summary-total"><span>Total <small>Delivery included</small></span><b>{money(total)}</b></div><p><LockKeyhole/> Secure checkout powered by Supabase</p></aside></main>}
 
 function OrderSuccess({site}:{site:Settings}){
  const {orderNumber}=useParams();
