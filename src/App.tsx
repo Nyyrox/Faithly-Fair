@@ -68,9 +68,7 @@ function Checkout({cart,site,clear}:{cart:CartItem[];site:Settings;clear:()=>voi
       address_line1:fd.get('address1'),
       address_line2:fd.get('address2'),
       landmark:fd.get('landmark'),
-      city:fd.get('city'),
-      state:fd.get('state'),
-      pincode:fd.get('pincode')
+      city:fd.get('city')
     },
     payment_method:method,
     items:cart.map(x=>({product_id:x.product.id,quantity:x.quantity}))
