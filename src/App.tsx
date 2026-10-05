@@ -94,7 +94,7 @@ function Checkout({cart,site,clear}:{cart:CartItem[];site:Settings;clear:()=>voi
  async function sendEmailVerification(){
    const normalized=email.trim().toLowerCase();
    if(!supabase){setEmailVerificationMessage('Connect Supabase to verify email.');return;}
-   if(!normalized||!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(normalized)){
+   if(!normalized||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)){
      setEmailVerificationMessage('Enter a valid email address first.');
      return;
    }
