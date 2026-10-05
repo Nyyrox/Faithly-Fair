@@ -560,3 +560,54 @@ footer{
 .payment-choices>label:active input[type="radio"]{
   transform:scale(.9);
 }
+
+/* COD email OTP verification */
+.email-verification{
+  margin-top:18px;
+  padding:18px;
+  border:1px solid rgba(148,70,77,.16);
+  border-radius:18px;
+  background:rgba(255,250,249,.72);
+}
+.email-verification-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+  margin-bottom:12px;
+}
+.email-verification-head div{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.email-verification-head strong{font-size:14px}
+.email-verification-head small,.otp-note{color:var(--muted,#806f72);font-size:12px}
+.verified-badge{
+  flex:0 0 auto;
+  padding:6px 10px;
+  border-radius:999px;
+  background:#eaf8ee;
+  color:#2b8b4a;
+  font-size:11px;
+  font-weight:700;
+}
+.verify-email-btn{margin-top:2px}
+.otp-row{
+  display:flex;
+  gap:10px;
+}
+.otp-row input{
+  flex:1;
+  min-width:0;
+}
+.otp-row .btn{white-space:nowrap}
+.otp-note,.email-verification .success-note{
+  display:block;
+  margin-top:10px;
+}
+@media(max-width:600px){
+  .email-verification-head{flex-direction:column}
+  .otp-row{flex-direction:column}
+  .otp-row .btn{width:100%}
+}
