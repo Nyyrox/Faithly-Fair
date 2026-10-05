@@ -56,87 +56,274 @@ function CartPage({cart,qty,remove}:{cart:CartItem[];qty:(id:string,n:number)=>v
 
 function ProductPage({products,add}:{products:Product[];add:(p:Product)=>void}){const {slug}=useParams(),p=products.find(x=>x.slug===slug);if(!p)return <Navigate to="/"/>;return <main className="product-page"><div className="product-detail-art" style={{background:p.image_url?`url(${p.image_url}) center/cover`:placeholder(0)}}>{!p.image_url&&<Gift/>}</div><div className="product-detail-copy"><Link to="/">← Back to gifts</Link><span className="eyebrow">A thoughtful little something</span><h1>{p.name}</h1><div className="detail-price">{money(p.price)} <small>delivery included</small></div><p>{p.description}</p><ul><li><Check/> Carefully curated by hand</li><li><Check/> Beautifully gift-ready</li><li><Check/> Thoughtful, secure packaging</li></ul><button className="btn wide" disabled={!p.stock_quantity} onClick={()=>add(p)}><ShoppingBag/> Add to gift bag</button><small>{p.stock_quantity} currently available</small></div></main>}
 
-function Checkout({cart,site,clear}:{cart:CartItem[];site:Settings;clear:()=>void}){const nav=useNavigate(),total=cart.reduce((n,x)=>n+x.product.price*x.quantity,0),[method,setMethod]=useState<'cod'|'esewa'>('cod'),[proofFile,setProofFile]=useState<File|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[email,setEmail]=useState(()=>sessionStorage.getItem('ff-cod-email')||''),[emailVerificationSent,setEmailVerificationSent]=useState(false),[emailVerified,setEmailVerified]=useState(''),[emailVerificationBusy,setEmailVerificationBusy]=useState(false),[emailVerificationMessage,setEmailVerificationMessage]=useState('');useEffect(()=>{const field=document.querySelector<HTMLInputElement>('input[name="email"]');if(field){field.required=true;field.placeholder='Required for order updates';field.setAttribute('aria-label','Email address required')}if(!supabase){setError('Checkout preview is active. Add your Supabase URL and anon key in .env.local before placing live orders.');return;}supabase.auth.getSession().then(({data})=>{const verified=String(data.session?.user?.email||'').toLowerCase();const target=sessionStorage.getItem('ff-cod-email')||'';if(verified&&verified===target){setEmail(target);setEmailVerified(verified);setEmailVerificationMessage('✓ Email verified. You can place the COD order.')}})},[]);
- async function sendEmailVerification(){const normalized=email.trim().toLowerCase();if(!supabase){setEmailVerificationMessage('Connect Supabase to verify email.');return;}if(!normalized||!/^\S+@\S+.\S+$/.test(normalized)){setEmailVerificationMessage('Enter a valid email address first.');return;}setEmailVerificationBusy(true);setEmailVerificationMessage('');setError('');sessionStorage.setItem('ff-cod-email',normalized);const {error}=await supabase.auth.signInWithOtp({email:normalized,options:{shouldCreateUser:true,emailRedirectTo:`${window.location.origin}/checkout`}});if(error)setEmailVerificationMessage(error.message);else{setEmailVerificationSent(true);setEmailVerificationMessage('Verification email sent. Open it and tap “Confirm email address”, then return here.');}setEmailVerificationBusy(false);}
-async function checkEmailVerification(){const normalized=email.trim().toLowerCase();if(!supabase){setEmailVerificationMessage('Connect Supabase to verify email.');return;}setEmailVerificationBusy(true);setEmailVerificationMessage('');const {data,error}=await supabase.auth.getSession();const verified=String(data.session?.user?.email||'').toLowerCase();if(error||verified!==normalized){setEmailVerified('');setEmailVerificationMessage('Not verified yet. Open the email and tap the confirmation link first.');}else{setEmailVerified(verified);setEmailVerificationMessage('✓ Email verified. You can place the COD order.');}setEmailVerificationBusy(false);}
-async function submit(e:FormEvent<HTMLFormElement>){
-  e.preventDefault();
-  setError('');
-  if(!cart.length)return;
+function Checkout({cart,site,clear}:{cart:CartItem[];site:Settings;clear:()=>void}){
+ const nav=useNavigate();
+ const total=cart.reduce((n,x)=>n+x.product.price*x.quantity,0);
+ const [method,setMethod]=useState<'cod'|'esewa'>('cod');
+ const [proofFile,setProofFile]=useState<File|null>(null);
+ const [busy,setBusy]=useState(false);
+ const [error,setError]=useState('');
+ const [email,setEmail]=useState(()=>sessionStorage.getItem('ff-cod-email')||'');
+ const [emailVerificationSent,setEmailVerificationSent]=useState(false);
+ const [emailVerified,setEmailVerified]=useState('');
+ const [emailVerificationBusy,setEmailVerificationBusy]=useState(false);
+ const [emailVerificationMessage,setEmailVerificationMessage]=useState('');
 
-  const fd=new FormData(e.currentTarget);
-  const payload={
-    customer:{
-      name:fd.get('name'),
-      mobile:fd.get('mobile'),
-      alternate_mobile:fd.get('alternate'),
-      email:fd.get('email'),
-      address_line1:fd.get('address1'),
-      address_line2:fd.get('address2'),
-      landmark:fd.get('landmark'),
-      city:fd.get('city')
-    },
-    payment_method:method,
-    items:cart.map(x=>({product_id:x.product.id,quantity:x.quantity}))
-  };
+ useEffect(()=>{
+   if(!supabase){
+     setError('Checkout preview is active. Add your Supabase URL and anon key in .env.local before placing live orders.');
+     return;
+   }
+   const field=document.querySelector<HTMLInputElement>('input[name="email"]');
+   if(field){
+     field.required=true;
+     field.placeholder='Required for order updates';
+     field.setAttribute('aria-label','Email address required');
+   }
+   supabase.auth.getSession().then(({data})=>{
+     const verified=String(data.session?.user?.email||'').toLowerCase();
+     const target=sessionStorage.getItem('ff-cod-email')||'';
+     if(verified&&verified===target){
+       setEmail(target);
+       setEmailVerified(verified);
+       setEmailVerificationMessage('✓ Email verified. You can place the COD order.');
+     }
+   });
+ },[]);
 
-  const normalizedEmail=email.trim().toLowerCase();
-  if(method==='cod'&&emailVerified!==normalizedEmail){setError('Please verify your email before placing a COD order.');return;}
+ async function sendEmailVerification(){
+   const normalized=email.trim().toLowerCase();
+   if(!supabase){setEmailVerificationMessage('Connect Supabase to verify email.');return;}
+   if(!normalized||!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(normalized)){
+     setEmailVerificationMessage('Enter a valid email address first.');
+     return;
+   }
+   setEmailVerificationBusy(true);
+   setEmailVerificationMessage('');
+   setError('');
+   sessionStorage.setItem('ff-cod-email',normalized);
+   const {error}=await supabase.auth.signInWithOtp({
+     email:normalized,
+     options:{shouldCreateUser:true,emailRedirectTo:`${window.location.origin}/checkout`}
+   });
+   if(error){
+     setEmailVerificationMessage(error.message);
+   }else{
+     setEmailVerificationSent(true);
+     setEmailVerificationMessage('Verification email sent. Open it and tap “Confirm email address”, then return here.');
+   }
+   setEmailVerificationBusy(false);
+ }
 
-  setBusy(true);
-  try{
-    if(!supabase)throw new Error('Connect Supabase to place live orders. See SETUP.md.');
+ async function checkEmailVerification(){
+   const normalized=email.trim().toLowerCase();
+   if(!supabase){setEmailVerificationMessage('Connect Supabase to verify email.');return;}
+   setEmailVerificationBusy(true);
+   setEmailVerificationMessage('');
+   const {data,error}=await supabase.auth.getSession();
+   const verified=String(data.session?.user?.email||'').toLowerCase();
+   if(error||verified!==normalized){
+     setEmailVerified('');
+     setEmailVerificationMessage('Not verified yet. Open the email and tap the confirmation link first.');
+   }else{
+     setEmailVerified(verified);
+     setEmailVerificationMessage('✓ Email verified. You can place the COD order.');
+   }
+   setEmailVerificationBusy(false);
+ }
 
-    if(method==='esewa'){
-      if(!proofFile)throw new Error('Please upload your eSewa payment screenshot.');
-      if(!['image/jpeg','image/png','image/webp'].includes(proofFile.type)||proofFile.size>5*1024*1024){
-        throw new Error('Use a JPG, PNG, or WebP screenshot under 5 MB.');
-      }
+ async function submit(e:FormEvent<HTMLFormElement>){
+   e.preventDefault();
+   setError('');
+   if(!cart.length)return;
 
-      // Upload the payment proof first. The order is created only after
-      // the screenshot has successfully reached Supabase Storage.
-      const extension=proofFile.name.split('.').pop()?.toLowerCase()||'jpg';
-      const pendingPath=`pending/${safeId()}/${safeId()}.${extension}`;
-      const {error:uploadError}=await supabase.storage.from('payment-proofs').upload(pendingPath,proofFile,{
-        contentType:proofFile.type,
-        upsert:false
-      });
-      if(uploadError)throw uploadError;
+   const fd=new FormData(e.currentTarget);
+   const payload={
+     customer:{
+       name:fd.get('name'),
+       mobile:fd.get('mobile'),
+       alternate_mobile:fd.get('alternate'),
+       email:fd.get('email'),
+       address_line1:fd.get('address1'),
+       address_line2:fd.get('address2'),
+       landmark:fd.get('landmark'),
+       city:fd.get('city')
+     },
+     payment_method:method,
+     items:cart.map(x=>({product_id:x.product.id,quantity:x.quantity}))
+   };
 
-      const {data,error}=await supabase.rpc('create_guest_order',{order_payload:payload});
-      if(error)throw error;
+   const normalizedEmail=email.trim().toLowerCase();
+   if(method==='cod'&&emailVerified!==normalizedEmail){
+     setError('Please verify your email before placing a COD order.');
+     return;
+   }
 
-      const finalPath=`${data.upload_token}/${safeId()}.${extension}`;
-      const {error:moveError}=await supabase.storage.from('payment-proofs').move(pendingPath,finalPath);
-      if(moveError)throw moveError;
+   setBusy(true);
+   try{
+     if(!supabase)throw new Error('Connect Supabase to place live orders. See SETUP.md.');
 
-      const {error:proofError}=await supabase.rpc('submit_payment_proof',{
-        proof_token:data.upload_token,
-        storage_path:finalPath,
-        file_type:proofFile.type,
-        file_size:proofFile.size
-      });
-      if(proofError)throw proofError;
+     if(method==='esewa'){
+       if(!proofFile)throw new Error('Please upload your eSewa payment screenshot.');
+       if(!['image/jpeg','image/png','image/webp'].includes(proofFile.type)||proofFile.size>5*1024*1024){
+         throw new Error('Use a JPG, PNG, or WebP screenshot under 5 MB.');
+       }
 
-      clear();
-      nav(`/order/${data.order_number}`,{state:{order:{...data,payment_status:'proof_submitted'},site}});
-      return;
-    }
+       const extension=proofFile.name.split('.').pop()?.toLowerCase()||'jpg';
+       const pendingPath=`pending/${safeId()}/${safeId()}.${extension}`;
+       const {error:uploadError}=await supabase.storage.from('payment-proofs').upload(pendingPath,proofFile,{
+         contentType:proofFile.type,
+         upsert:false
+       });
+       if(uploadError)throw uploadError;
 
-    const {data,error}=await supabase.rpc('create_guest_order',{order_payload:payload});
-    if(error)throw error;
-    await supabase.auth.signOut();
-    clear();
-    nav(`/order/${data.order_number}`,{state:{order:data,site}});
-  }catch(x){
-    setError(x && typeof x==='object' && 'message' in x ? String((x as any).message) : x instanceof Error?x.message:'Could not place order.');
-  }finally{
-    setBusy(false);
-  }
-}
+       const {data,error}=await supabase.rpc('create_guest_order',{order_payload:payload});
+       if(error)throw error;
+
+       const finalPath=`${data.upload_token}/${safeId()}.${extension}`;
+       const {error:moveError}=await supabase.storage.from('payment-proofs').move(pendingPath,finalPath);
+       if(moveError)throw moveError;
+
+       const {error:proofError}=await supabase.rpc('submit_payment_proof',{
+         proof_token:data.upload_token,
+         storage_path:finalPath,
+         file_type:proofFile.type,
+         file_size:proofFile.size
+       });
+       if(proofError)throw proofError;
+
+       clear();
+       nav(`/order/${data.order_number}`,{state:{order:{...data,payment_status:'proof_submitted'},site}});
+       return;
+     }
+
+     const {data,error}=await supabase.rpc('create_guest_order',{order_payload:payload});
+     if(error)throw error;
+     await supabase.auth.signOut();
+     clear();
+     sessionStorage.removeItem('ff-cod-email');
+     nav(`/order/${data.order_number}`,{state:{order:data,site}});
+   }catch(x){
+     setError(x&&typeof x==='object'&&'message' in x?String((x as any).message):x instanceof Error?x.message:'Could not place order.');
+   }finally{
+     setBusy(false);
+   }
+ }
+
  if(!cart.length)return <main className="checkout empty-page"><Gift/><h1>Your gift bag is empty</h1><Link className="btn" to="/#shop">Browse gifts</Link></main>;
- return <main className="checkout"><div className="checkout-head"><span className="eyebrow">Almost there</span><h1>Where should we send the joy?</h1><p>Delivery is included. Fill in the details below and choose how you'd like to pay.</p></div><form onSubmit={submit}><section className="form-card"><h2><em>1</em> Contact details</h2><div className="fields two"><label>Full name *<input name="name" required autoComplete="name" placeholder="Your full name"/></label><label>Mobile number *<input name="mobile" required pattern="(?:\+977[ -]?)?9[78][0-9]{8}" inputMode="tel" placeholder="+977 98XXXXXXXX"/></label><label>Alternate mobile<input name="alternate" pattern="(?:\\+977[ -]?)?9[78][0-9]{8}" inputMode="tel" placeholder="Optional Nepal mobile"/></label><label>Email *<input name="email" type="email" required value={email} onChange={e=>{const v=e.target.value;setEmail(v);if(emailVerified||emailVerificationSent){setEmailVerified('');setEmailVerificationSent(false);setEmailVerificationMessage('Email changed. Verify the new address.');sessionStorage.setItem('ff-cod-email',v)}}} placeholder="you@example.com"/></label></div></section><section className="form-card"><h2><em>2</em> Delivery address</h2><div className="fields"><label>Address line 1 *<input name="address1" required placeholder="House / flat number, street"/></label><label>Address line 2<input name="address2" placeholder="Area / locality"/></label><label>Landmark<input name="landmark" placeholder="Optional"/></label><div className="fields three"><label>City *<input name="city" required/></label>{site.show_state&&<label>State *<input name="state" required/></label>}{site.show_pincode&&<label>Pincode *<input name="pincode" required pattern="[0-9]{5}" inputMode="numeric"/></label>}</div></div></section><section className="form-card"><h2><em>3</em> Payment</h2><div className="payment-choices"><label className={method==='cod'?'selected':''}><input type="radio" checked={method==='cod'} onChange={()=>setMethod('cod')}/><span><b>Cash on delivery</b><small>Pay when your gift arrives</small></span><PackageCheck/></label><label className={method==='esewa'?'selected':''}><input type="radio" checked={method==='esewa'} onChange={()=>setMethod('esewa')}/><span><b>Pay with eSewa QR</b><small>Scan, pay the exact amount, then upload screenshot</small></span><ShieldCheck/></label></div>{method==='esewa'&&<div className="esewa-qr-payment"><div className="esewa-qr-box"><QRCodeSVG value={JSON.stringify({eSewa_id:'9705197786',name:'MD Aaftab Hussain'})} size={220} includeMargin/></div><div><span className="eyebrow">Amount to pay</span><h3>{money(total)}</h3><p>Scan the QR in eSewa, enter this exact amount, complete the payment, then upload your screenshot.</p><label className="direct-upload"><Upload/><span>{proofFile?'Change screenshot':'Upload payment screenshot'}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>setProofFile(e.target.files?.[0]||null)}/></span></label>{proofFile&&<small>{proofFile.name}</small>}</div></div>}{method==='cod'&&<div className="email-verification"><div className="email-verification-head"><div><strong>Verify email for COD</strong><small>We’ll send a confirmation link before the order can be placed.</small></div>{emailVerified===email.trim().toLowerCase()&&emailVerified?<span className="verified-badge">✓ Verified</span>:null}</div>{!emailVerified&&<div className="verification-link-actions"><button type="button" className="btn verify-email-btn" disabled={emailVerificationBusy||!email.trim()} onClick={sendEmailVerification}>{emailVerificationBusy?'Sending…':emailVerificationSent?'Resend verification email':'Send verification email'}</button>{emailVerificationSent&&<button type="button" className="text-link" disabled={emailVerificationBusy} onClick={checkEmailVerification}>{emailVerificationBusy?'Checking…':'I already confirmed my email'}</button>}</div>}{emailVerificationMessage&&<small className={emailVerified?'success-note':'otp-note'}>{emailVerificationMessage}</small>}</div></section>{error&&<p className="error">{error}</p>}<button className="btn wide submit" disabled={busy||(method==='cod'&&emailVerified!==email.trim().toLowerCase())}>{busy?'Creating your order…':method==='cod'&&!emailVerified?'Verify email to place order':`Place order · ${money(total)}`}<ArrowRight/></button></form><aside className="order-summary"><h2>Your gift bag</h2>{cart.map(x=><div className="summary-line" key={x.product.id}><div className="mini-art" style={{background:x.product.image_url?`url(${x.product.image_url}) center/cover`:placeholder()}}/><span>{x.product.name}<small>Qty {x.quantity}</small></span><b>{money(x.product.price*x.quantity)}</b></div>)}<div className="summary-total"><span>Total <small>Delivery included</small></span><b>{money(total)}</b></div><p><LockKeyhole/> Secure checkout powered by Supabase</p></aside></main>}
 
+ return <main className="checkout">
+   <div className="checkout-head">
+     <span className="eyebrow">Almost there</span>
+     <h1>Where should we send the joy?</h1>
+     <p>Delivery is included. Fill in the details below and choose how you'd like to pay.</p>
+   </div>
+   <form onSubmit={submit}>
+     <section className="form-card">
+       <h2><em>1</em> Contact details</h2>
+       <div className="fields two">
+         <label>Full name *<input name="name" required autoComplete="name" placeholder="Your full name"/></label>
+         <label>Mobile number *<input name="mobile" required pattern="(?:\\+977[ -]?)?9[78][0-9]{8}" inputMode="tel" placeholder="+977 98XXXXXXXX"/></label>
+         <label>Alternate mobile<input name="alternate" pattern="(?:\\+977[ -]?)?9[78][0-9]{8}" inputMode="tel" placeholder="Optional Nepal mobile"/></label>
+         <label>Email *<input name="email" type="email" required value={email} onChange={e=>{
+           const v=e.target.value;
+           setEmail(v);
+           sessionStorage.setItem('ff-cod-email',v);
+           if(emailVerified||emailVerificationSent){
+             setEmailVerified('');
+             setEmailVerificationSent(false);
+             setEmailVerificationMessage('Email changed. Verify the new address.');
+           }
+         }} placeholder="you@example.com"/></label>
+       </div>
+     </section>
+
+     <section className="form-card">
+       <h2><em>2</em> Delivery address</h2>
+       <div className="fields">
+         <label>Address line 1 *<input name="address1" required placeholder="House / flat number, street"/></label>
+         <label>Address line 2<input name="address2" placeholder="Area / locality"/></label>
+         <label>Landmark<input name="landmark" placeholder="Optional"/></label>
+         <div className="fields three">
+           <label>City *<input name="city" required/></label>
+           {site.show_state&&<label>State *<input name="state" required/></label>}
+           {site.show_pincode&&<label>Pincode *<input name="pincode" required pattern="[0-9]{5}" inputMode="numeric"/></label>}
+         </div>
+       </div>
+     </section>
+
+     <section className="form-card">
+       <h2><em>3</em> Payment</h2>
+       <div className="payment-choices">
+         <label className={method==='cod'?'selected':''}>
+           <input type="radio" checked={method==='cod'} onChange={()=>setMethod('cod')}/>
+           <span><b>Cash on delivery</b><small>Pay when your gift arrives</small></span>
+           <PackageCheck/>
+         </label>
+         <label className={method==='esewa'?'selected':''}>
+           <input type="radio" checked={method==='esewa'} onChange={()=>setMethod('esewa')}/>
+           <span><b>Pay with eSewa QR</b><small>Scan, pay the exact amount, then upload screenshot</small></span>
+           <ShieldCheck/>
+         </label>
+       </div>
+
+       {method==='esewa'&&<div className="esewa-qr-payment">
+         <div className="esewa-qr-box">
+           <QRCodeSVG value={JSON.stringify({eSewa_id:'9705197786',name:'MD Aaftab Hussain'})} size={220} includeMargin/>
+         </div>
+         <div>
+           <span className="eyebrow">Amount to pay</span>
+           <h3>{money(total)}</h3>
+           <p>Scan the QR in eSewa, enter this exact amount, complete the payment, then upload your screenshot.</p>
+           <label className="direct-upload">
+             <Upload/>
+             <span>{proofFile?'Change screenshot':'Upload payment screenshot'}
+               <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>setProofFile(e.target.files?.[0]||null)}/>
+             </span>
+           </label>
+           {proofFile&&<small>{proofFile.name}</small>}
+         </div>
+       </div>}
+
+       {method==='cod'&&<div className="email-verification">
+         <div className="email-verification-head">
+           <div>
+             <strong>Verify email for COD</strong>
+             <small>We’ll send a confirmation link before the order can be placed.</small>
+           </div>
+           {emailVerified===email.trim().toLowerCase()&&emailVerified?<span className="verified-badge">✓ Verified</span>:null}
+         </div>
+         {!emailVerified&&<div className="verification-link-actions">
+           <button type="button" className="btn verify-email-btn" disabled={emailVerificationBusy||!email.trim()} onClick={sendEmailVerification}>
+             {emailVerificationBusy?'Sending…':emailVerificationSent?'Resend verification email':'Send verification email'}
+           </button>
+           {emailVerificationSent&&<button type="button" className="text-link" disabled={emailVerificationBusy} onClick={checkEmailVerification}>
+             {emailVerificationBusy?'Checking…':'I already confirmed my email'}
+           </button>}
+         </div>}
+         {emailVerificationMessage&&<small className={emailVerified?'success-note':'otp-note'}>{emailVerificationMessage}</small>}
+       </div>}
+     </section>
+
+     {error&&<p className="error">{error}</p>}
+     <button className="btn wide submit" disabled={busy||(method==='cod'&&emailVerified!==email.trim().toLowerCase())}>
+       {busy?'Creating your order…':method==='cod'&&!emailVerified?'Verify email to place order':`Place order · ${money(total)}`}
+       <ArrowRight/>
+     </button>
+   </form>
+
+   <aside className="order-summary">
+     <h2>Your gift bag</h2>
+     {cart.map(x=><div className="summary-line" key={x.product.id}>
+       <div className="mini-art" style={{background:x.product.image_url?`url(${x.product.image_url}) center/cover`:placeholder()}}/>
+       <span>{x.product.name}<small>Qty {x.quantity}</small></span>
+       <b>{money(x.product.price*x.quantity)}</b>
+     </div>)}
+     <div className="summary-total"><span>Total <small>Delivery included</small></span><b>{money(total)}</b></div>
+     <p><LockKeyhole/> Secure checkout powered by Supabase</p>
+   </aside>
+ </main>;
+}
 function OrderSuccess({site}:{site:Settings}){
  const {orderNumber}=useParams();
  const state=history.state?.usr as {order?:Order}|undefined;
