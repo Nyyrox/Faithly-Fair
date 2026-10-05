@@ -81,26 +81,32 @@ function Checkout({cart,site,clear}:{cart:CartItem[];site:Settings;clear:()=>voi
   try{
     if(!supabase)throw new Error('Connect Supabase to place live orders. See SETUP.md.');
 
-    const {data,error}=await supabase.rpc('create_guest_order',{order_payload:payload});
-    if(error)throw error;
-
     if(method==='esewa'){
       if(!proofFile)throw new Error('Please upload your eSewa payment screenshot.');
       if(!['image/jpeg','image/png','image/webp'].includes(proofFile.type)||proofFile.size>5*1024*1024){
         throw new Error('Use a JPG, PNG, or WebP screenshot under 5 MB.');
       }
 
+      // Upload the payment proof first. The order is created only after
+      // the screenshot has successfully reached Supabase Storage.
       const extension=proofFile.name.split('.').pop()?.toLowerCase()||'jpg';
-      const path=`${data.upload_token}/${safeId()}.${extension}`;
-      const {error:uploadError}=await supabase.storage.from('payment-proofs').upload(path,proofFile,{
+      const pendingPath=`pending/${safeId()}/${safeId()}.${extension}`;
+      const {error:uploadError}=await supabase.storage.from('payment-proofs').upload(pendingPath,proofFile,{
         contentType:proofFile.type,
         upsert:false
       });
       if(uploadError)throw uploadError;
 
+      const {data,error}=await supabase.rpc('create_guest_order',{order_payload:payload});
+      if(error)throw error;
+
+      const finalPath=`${data.upload_token}/${safeId()}.${extension}`;
+      const {error:moveError}=await supabase.storage.from('payment-proofs').move(pendingPath,finalPath);
+      if(moveError)throw moveError;
+
       const {error:proofError}=await supabase.rpc('submit_payment_proof',{
         proof_token:data.upload_token,
-        storage_path:path,
+        storage_path:finalPath,
         file_type:proofFile.type,
         file_size:proofFile.size
       });
@@ -111,6 +117,8 @@ function Checkout({cart,site,clear}:{cart:CartItem[];site:Settings;clear:()=>voi
       return;
     }
 
+    const {data,error}=await supabase.rpc('create_guest_order',{order_payload:payload});
+    if(error)throw error;
     clear();
     nav(`/order/${data.order_number}`,{state:{order:data,site}});
   }catch(x){
