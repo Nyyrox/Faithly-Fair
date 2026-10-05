@@ -32,9 +32,14 @@ async function hmacSha256(secret: string, message: string) {
 }
 
 function decodeEsewaData(value: string) {
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  // URL query parsing can turn base64 '+' characters into spaces.
+  const normalized = value
+    .replace(/ /g, "+")
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
   return JSON.parse(new TextDecoder().decode(
-    Uint8Array.from(atob(normalized), (char) => char.charCodeAt(0)),
+    Uint8Array.from(atob(padded), (char) => char.charCodeAt(0)),
   ));
 }
 
